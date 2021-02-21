@@ -727,6 +727,9 @@ static SRpcConn *rpcAllocateServerConn(SRpcInfo *pRpc, SRecvInfo *pRecv) {
     terrno = TSDB_CODE_RPC_MAX_SESSIONS;
   } else {
     pConn = pRpc->connList + sid;
+
+    rpcLockConn(pConn);
+
     memcpy(pConn->user, pHead->user, tListLen(pConn->user));
     pConn->pRpc = pRpc;
     pConn->sid = sid;
@@ -742,18 +745,22 @@ static SRpcConn *rpcAllocateServerConn(SRpcInfo *pRpc, SRecvInfo *pRecv) {
 
       if (terrno != 0) {
         taosFreeId(pRpc->idPool, sid);  // sid shall be released
+        rpcUnlockConn(pConn);
         pConn = NULL;
       }
     }
-  }
+    if (pConn) {
+       if (pRecv->connType == RPC_CONN_UDPS && pRpc->numOfThreads > 1) {
+         // UDP server, assign to new connection
+         pRpc->index = (pRpc->index + 1) % pRpc->numOfThreads;
+         pConn->localPort = (pRpc->localPort + pRpc->index);
+       }
+       rpcUnlockConn(pConn);
+      }
+   }
+ 
 
   if (pConn) {
-    if (pRecv->connType == RPC_CONN_UDPS && pRpc->numOfThreads > 1) {
-      // UDP server, assign to new connection
-      pRpc->index = (pRpc->index + 1) % pRpc->numOfThreads;
-      pConn->localPort = (pRpc->localPort + pRpc->index);
-    }
-
     taosHashPut(pRpc->hash, hashstr, size, (char *)&pConn, POINTER_BYTES);
     tDebug("%s %p server connection is allocated, uid:0x%x sid:%d key:%s", pRpc->label, pConn, pConn->linkUid, sid, hashstr);
   }
