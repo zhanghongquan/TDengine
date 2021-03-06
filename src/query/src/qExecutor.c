@@ -6490,7 +6490,7 @@ static int32_t createFilterInfo(void *pQInfo, SQuery *pQuery) {
       for (int32_t f = 0; f < pFilterInfo->numOfFilters; ++f) {
         SColumnFilterElem *pSingleColFilter = &pFilterInfo->pFilters[f];
         pSingleColFilter->filterInfo = pQuery->colList[i].filters[f];
-
+         
         int32_t lower = pSingleColFilter->filterInfo.lowerRelOptr;
         int32_t upper = pSingleColFilter->filterInfo.upperRelOptr;
         if (lower == TSDB_RELATION_INVALID && upper == TSDB_RELATION_INVALID) {
@@ -6505,6 +6505,9 @@ static int32_t createFilterInfo(void *pQInfo, SQuery *pQuery) {
         }
 
         pSingleColFilter->bytes = pQuery->colList[i].bytes;
+        if (lower == TSDB_RELATION_IN) {
+          buildFilterSetFromBinary(&pSingleColFilter->q, (char *)(pSingleColFilter->filterInfo.pz), pSingleColFilter->filterInfo.len);
+        }
       }
 
       j++;

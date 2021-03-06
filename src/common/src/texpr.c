@@ -458,3 +458,26 @@ tExprNode* exprTreeFromTableName(const char* tbnameCond) {
   CLEANUP_EXECUTE_TO(anchor, false);
   return expr;
 }
+
+void buildFilterSetFromBinary(void **q, const char *buf, int32_t len) {
+     
+  SBufferReader br = tbufInitReader(buf, len, false); 
+  uint32_t type  = tbufReadUint32(&br);     
+  SHashObj *pObj = taosHashInit(256, taosGetDefaultHashFunction(type), true, false);
+  int dummy = -1;
+  int  sz = tbufReadInt32(&br);
+  for (int32_t i = 0; i < sz; i++) {
+    if (type == TSDB_DATA_TYPE_BOOL || type == TSDB_DATA_TYPE_TINYINT || type == TSDB_DATA_TYPE_SMALLINT || type == TSDB_DATA_TYPE_BIGINT || type == TSDB_DATA_TYPE_INT) {
+      int64_t val = tbufReadInt64(&br); 
+      taosHashPut(pObj, (char *)&val, sizeof(val),  &dummy, sizeof(dummy));
+    } else if (type == TSDB_DATA_TYPE_DOUBLE || type == TSDB_DATA_TYPE_FLOAT) {
+      double  val = tbufReadDouble(&br);
+      taosHashPut(pObj, (char *)&val, sizeof(val), &dummy, sizeof(dummy));
+    } else if (type == TSDB_DATA_TYPE_BINARY || type == TSDB_DATA_TYPE_NCHAR) {
+      size_t  sz = 0;
+      const char *val = tbufReadBinary(&br, &sz);
+      taosHashPut(pObj, (char *)val, sz, &dummy, sizeof(dummy));
+    }
+  } 
+  *q = (void *)pObj;
+}

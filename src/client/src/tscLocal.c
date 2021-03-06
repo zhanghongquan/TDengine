@@ -430,7 +430,6 @@ static int32_t tscSCreateSetValueToResObj(SSqlObj *pSql, int32_t rowLen, const c
   SQueryInfo* pQueryInfo = tscGetQueryInfoDetail(&pSql->cmd, 0);
   int32_t numOfRows = 1;
   if (strlen(ddl) == 0) {
-    
   }
   tscInitResObjForLocalQuery(pSql, numOfRows, rowLen);
 

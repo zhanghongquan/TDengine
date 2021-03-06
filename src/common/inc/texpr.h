@@ -95,6 +95,7 @@ typedef void (*_arithmetic_operator_fn_t)(void *left, int32_t numLeft, int32_t l
 void arithmeticTreeTraverse(tExprNode *pExprs, int32_t numOfRows, char *pOutput, void *param, int32_t order,
                             char *(*cb)(void *, const char*, int32_t));
 
+void buildFilterSetFromBinary(void **q, const char *buf, int32_t len);
 #ifdef __cplusplus
 }
 #endif

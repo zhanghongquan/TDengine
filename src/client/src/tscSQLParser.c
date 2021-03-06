@@ -34,7 +34,7 @@
 #include "tstoken.h"
 #include "tstrbuild.h"
 #include "ttokendef.h"
-
+#include "qSqlparser.h"
 #define DEFAULT_PRIMARY_TIMESTAMP_COL_NAME "_c0"
 
 #define TSWINDOW_IS_EQUAL(t1, t2) (((t1).skey == (t2).skey) && ((t1).ekey == (t2).ekey))
@@ -61,6 +61,8 @@ static SSqlExpr* doAddProjectCol(SQueryInfo* pQueryInfo, int32_t colIndex, int32
 static int32_t setShowInfo(SSqlObj* pSql, SSqlInfo* pInfo);
 static char*   getAccountId(SSqlObj* pSql);
 
+static bool serializeExprListToVariant(tSQLExprList* pList, tVariant **dest);
+static int32_t validateParamOfRelationIn(tVariant *pVar, int32_t colType);
 static bool has(SArray* pFieldList, int32_t startIdx, const char* name);
 static char* cloneCurrentDBName(SSqlObj* pSql);
 static bool hasSpecifyDB(SStrToken* pTableName);
@@ -131,6 +133,62 @@ static int32_t doCheckForQuery(SSqlObj* pSql, SQuerySQL* pQuerySql, int32_t inde
 static int32_t exprTreeFromSqlExpr(SSqlCmd* pCmd, tExprNode **pExpr, const tSQLExpr* pSqlExpr, SQueryInfo* pQueryInfo, SArray* pCols, int64_t *uid);
 static bool    validateDebugFlag(int32_t flag);
 
+// serialize expr in exprlist to binary 
+// formate  "type | size | value"
+bool serializeExprListToVariant(tSQLExprList* pList, tVariant **dst) {
+  bool ret = false;
+  if (!pList || pList->nExpr <= 0) {
+    return ret;
+  }
+  
+  SBufferWriter bw = tbufInitWriter( NULL, false );
+  tbufEnsureCapacity(&bw, 512);
+
+  toTSDBType(pList->a[0].pNode->token.type);  
+  uint32_t type = pList->a[0].pNode->token.type;
+  int32_t  size = pList->nExpr;
+  tbufWriteUint32(&bw, type);  
+  tbufWriteInt32(&bw,  size);
+   
+  for (int32_t i = 0; i < size; i++) {
+    tSQLExpr* pSub = pList->a[i].pNode;   
+
+    // validate type in exprList
+    if (pList->a[0].pNode->token.type != pSub->token.type) {
+      break;
+    }
+    tVariant var;  
+    tVariantCreate(&var, &pSub->token); 
+    if (type == TSDB_DATA_TYPE_BOOL || type == TSDB_DATA_TYPE_TINYINT || type == TSDB_DATA_TYPE_SMALLINT 
+         || type == TSDB_DATA_TYPE_BIGINT || type == TSDB_DATA_TYPE_INT) {
+      tbufWriteInt64(&bw, var.i64);        
+    } else if (type == TSDB_DATA_TYPE_DOUBLE || type == TSDB_DATA_TYPE_FLOAT) {
+      tbufWriteDouble(&bw, var.dKey);
+    } else if (type == TSDB_DATA_TYPE_BINARY || type == TSDB_DATA_TYPE_NCHAR) {
+      tbufWriteBinary(&bw, var.pz, var.nLen);
+    }
+    tVariantDestroy(&var);
+
+    if (i == size - 1) { ret = true;}
+  }
+
+  if (ret == true) {
+    if ((*dst = calloc(1, sizeof(tVariant))) != NULL) {
+      tVariantCreateFromBinary(*dst, tbufGetData(&bw, false), tbufTell(&bw), TSDB_DATA_TYPE_BINARY);    
+    } else {
+      ret = false;
+    }
+  }
+  tbufCloseWriter(&bw); 
+  return ret;
+}
+static int32_t validateParamOfRelationIn(tVariant *pVar, int32_t colType) {
+  if (pVar->nType != TSDB_DATA_TYPE_BINARY) {
+    return -1; 
+  }
+  SBufferReader br = tbufInitReader(pVar->pz, pVar->nLen, false); 
+  return tbufReadUint32(&br) == colType ? 0: -1;     
+}
 int16_t getNewResColId(SQueryInfo* pQueryInfo) {
   return pQueryInfo->resColumnId--;
 }
@@ -170,6 +228,8 @@ static uint8_t convertOptr(SStrToken *pToken) {
       return TSDB_RELATION_ISNULL;
     case TK_NOTNULL:
       return TSDB_RELATION_NOTNULL;
+    case TK_IN:
+      return TSDB_RELATION_IN;
     default: { return 0; }
   }
 }
@@ -3110,6 +3170,25 @@ static int32_t doExtractColumnFilterInfo(SSqlCmd* pCmd, SQueryInfo* pQueryInfo, 
     retVal = tVariantDump(&pRight->val, (char*)&pColumnFilter->upperBndd, colType, false);
 
   // TK_GT,TK_GE,TK_EQ,TK_NE are based on the pColumn->lowerBndd
+  } else if (pExpr->nSQLOptr == TK_IN) {
+    tVariant *pVal; 
+    if (pRight->nSQLOptr != TK_SET || serializeExprListToVariant(pRight->pParam, &pVal) == false) {
+      return invalidSqlErrMsg(tscGetErrorMsgPayload(pCmd), msg);
+    }         
+    if (validateParamOfRelationIn(pVal, colType) != TSDB_CODE_SUCCESS) {
+      tVariantDestroy(pVal); 
+      free(pVal);
+      return invalidSqlErrMsg(tscGetErrorMsgPayload(pCmd), msg);
+    }
+    pColumnFilter->pz  = (int64_t)calloc(1, pVal->nLen + 1);
+    pColumnFilter->len = pVal->nLen;
+    pColumnFilter->filterstr = 1;
+    memcpy((char *)(pColumnFilter->pz), (char *)(pVal->pz), pVal->nLen);  
+    //retVal = tVariantDump(pVal, (char *)(pColumnFilter->pz), TSDB_DATA_TYPE_BINARY, false);
+
+    tVariantDestroy(pVal); 
+    free(pVal);
+      
   } else if (colType == TSDB_DATA_TYPE_BINARY) {
     pColumnFilter->pz = (int64_t)calloc(1, pRight->val.nLen + TSDB_NCHAR_SIZE);
     pColumnFilter->len = pRight->val.nLen;
@@ -3157,6 +3236,9 @@ static int32_t doExtractColumnFilterInfo(SSqlCmd* pCmd, SQueryInfo* pQueryInfo, 
       break;
     case TK_NOTNULL:
       pColumnFilter->lowerRelOptr = TSDB_RELATION_NOTNULL;
+      break;
+    case TK_IN:
+      pColumnFilter->lowerRelOptr = TSDB_RELATION_IN;
       break;
     default:
       return invalidSqlErrMsg(tscGetErrorMsgPayload(pCmd), msg);
@@ -3309,10 +3391,8 @@ static int32_t tablenameListToString(tSQLExpr* pExpr, SStringBuilder* sb) {
     return TSDB_CODE_TSC_INVALID_SQL;
   }
 
-  if (pList->nExpr > 0) {
-    taosStringBuilderAppendStringLen(sb, QUERY_COND_REL_PREFIX_IN, QUERY_COND_REL_PREFIX_IN_LEN);
-  }
-
+  taosStringBuilderAppendStringLen(sb, QUERY_COND_REL_PREFIX_IN, QUERY_COND_REL_PREFIX_IN_LEN);
+ 
   for (int32_t i = 0; i < pList->nExpr; ++i) {
     tSQLExpr* pSub = pList->a[i].pNode;
     taosStringBuilderAppendStringLen(sb, pSub->val.pz, pSub->val.nLen);
@@ -3390,6 +3470,7 @@ static int32_t extractColumnFilterInfo(SSqlCmd* pCmd, SQueryInfo* pQueryInfo, SC
       && pExpr->nSQLOptr != TK_ISNULL
       && pExpr->nSQLOptr != TK_NOTNULL
       && pExpr->nSQLOptr != TK_LIKE
+      && pExpr->nSQLOptr != TK_IN
       ) {
       return invalidSqlErrMsg(tscGetErrorMsgPayload(pCmd), msg2);
     }
@@ -4296,7 +4377,6 @@ static void doAddJoinTagsColumnsIntoTagList(SSqlCmd* pCmd, SQueryInfo* pQueryInf
     tscColumnListInsert(pTableMetaInfo->tagColList, &index);
   }
 }
-
 static int32_t validateTagCondExpr(SSqlCmd* pCmd, tExprNode *p) {
   const char *msg1 = "invalid tag operator";
   const char* msg2 = "not supported filter condition";
@@ -4357,7 +4437,12 @@ static int32_t validateTagCondExpr(SSqlCmd* pCmd, tExprNode *p) {
       free(tmp);
     } else {
       double tmp;
-      retVal = tVariantDump(vVariant, (char*)&tmp, schemaType, false);
+
+      if (p->_node.optr == TSDB_RELATION_IN) {
+       retVal = validateParamOfRelationIn(vVariant, schemaType);  
+      } else {
+       retVal = tVariantDump(vVariant, (char*)&tmp, schemaType, false);
+      } 
     }
     
     if (retVal != TSDB_CODE_SUCCESS) {
@@ -6993,6 +7078,14 @@ int32_t exprTreeFromSqlExpr(SSqlCmd* pCmd, tExprNode **pExpr, const tSQLExpr* pS
       }
       
       return TSDB_CODE_SUCCESS;
+    } else if (pSqlExpr->nSQLOptr == TK_SET) {
+      tVariant *pVal;
+      if (serializeExprListToVariant(pSqlExpr->pParam, &pVal) == false) {
+        return invalidSqlErrMsg(tscGetErrorMsgPayload(pCmd), "not support filter expression");
+      } 
+      *pExpr = calloc(1, sizeof(tExprNode));
+      (*pExpr)->nodeType = TSQL_NODE_VALUE;
+      (*pExpr)->pVal = pVal; 
     } else {
       return invalidSqlErrMsg(tscGetErrorMsgPayload(pCmd), "not support filter expression");
     }
