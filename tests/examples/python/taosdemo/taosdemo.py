@@ -27,9 +27,20 @@ from multipledispatch import dispatch
 from concurrent.futures import ThreadPoolExecutor, wait, ALL_COMPLETED
 
 
-global verbose
 global debug
 global threads
+
+measure = True
+verbose = False
+native = False
+numOfTb = 1
+numOfStb = 1
+numOfRec = 10
+current_db = ""
+tbName = "tb"
+stbName = "stb"
+autosubtable = False
+batch = 1
 
 
 def PrintLineno():
@@ -173,6 +184,7 @@ def query_data_process(cmd: str):
                 config=configDir)
             v_print("conn: %s", str(conn.__class__))
         except Exception as e:
+            PrintLineno()
             print("Error: %s" % e.args[0])
             sys.exit(1)
 
@@ -180,6 +192,7 @@ def query_data_process(cmd: str):
             cursor = conn.cursor()
             v_print("cursor:%d %s", id(cursor), str(cursor.__class__))
         except Exception as e:
+            PrintLineno()
             print("Error: %s" % e.args[0])
             conn.close()
             sys.exit(1)
@@ -193,6 +206,7 @@ def query_data_process(cmd: str):
             for col in data:
                 print(col)
         except Exception as e:
+            PrintLineno()
             conn.close()
             print("Error: %s" % e.args[0])
             sys.exit(1)
@@ -284,13 +298,23 @@ def drop_databases():
                 (dbName, i))
 
 
-def insert_func(process: int, thread: int, verbose: bool):
+def insert_func(process: int, thread: int):
+    global verbose
+
+    PrintLineno()
+    print("verbose: %d" % verbose)
     if verbose:
         print("%d process %d thread, insert_func " % (process, thread))
 
     PrintLineno()
     # generate uuid
-    uuid_int = random.randint(0, numOfTb + 1)
+    try:
+        global numOfTb
+        uuid_int = random.randint(0, numOfTb + 1)
+    except Exception as e:
+        PrintLineno()
+        print("Error: %s" % e.args[0])
+
     PrintLineno()
     uuid = "%s" % uuid_int
     PrintLineno()
@@ -299,39 +323,62 @@ def insert_func(process: int, thread: int, verbose: bool):
 
     PrintLineno()
     # establish connection if native
-    if native:
-        if verbose:
-            print(
-                "host:%s, user:%s passwd:%s configDir:%s " %
-                (host,
-                 user,
-                 password,
-                 configDir))
-        try:
-            conn = taos.connect(
-                host=host,
-                user=user,
-                password=password,
-                config=configDir)
-            if verbose:
-                print("conn: %s" % str(conn.__class__))
-        except Exception as e:
-            print("Error: %s" % e.args[0])
-            sys.exit(1)
+    global native
 
-        try:
-            cursor = conn.cursor()
+    try:
+        if native:
             if verbose:
-                print("cursor:%d %s" % (id(cursor), str(cursor.__class__)))
-        except Exception as e:
-            print("Error: %s" % e.args[0])
-            conn.close()
-            sys.exit(1)
+                try:
+                    print(
+                        "host:%s, user:%s passwd:%s configDir:%s " %
+                        (host,
+                         user,
+                         password,
+                         configDir))
+                except Exception as e:
+                    PrintLineno()
+                    print("Error: %s" % e.args[0])
+            try:
+                conn = taos.connect(
+                    host=host,
+                    user=user,
+                    password=password,
+                    config=configDir)
+                if verbose:
+                    print("conn: %s" % str(conn.__class__))
+            except Exception as e:
+                PrintLineno()
+                print("Error: %s" % e.args[0])
+                sys.exit(1)
+
+            PrintLineno()
+            try:
+                cursor = conn.cursor()
+                if verbose:
+                    print("cursor:%d %s" % (id(cursor), str(cursor.__class__)))
+            except Exception as e:
+                PrintLineno()
+                print("Error: %s" % e.args[0])
+                conn.close()
+                sys.exit(1)
+    except Exception as e:
+        print("Error: %s" % e.args[0])
+
+    PrintLineno()
+    global numOfRec
 
     if verbose:
         print("numOfRec %d:" % numOfRec)
 
+    PrintLineno()
     row = 0
+    global current_db
+    global tbName
+    global stbName
+    global numOfStb
+    global autosubtable
+    global batch
+
     while row < numOfRec:
         if verbose:
             print("row: %d" % row)
@@ -361,16 +408,27 @@ def insert_func(process: int, thread: int, verbose: bool):
                     break
 
         except Exception as e:
+            PrintLineno()
             print("Error: %s" % e.args[0])
+            sys.exit(1)
 
         cmd = ' '.join(sqlCmd)
 
-    if verbose:
-        print("cmd: %s, length:%d" % (cmd, len(cmd)))
+    PrintLineno()
+    try:
+        if verbose:
+            print("cmd: %s, length:%d" % (cmd, len(cmd)))
+    except Exception as e:
+        PrintLineno()
+        print("Error: %s" % e.args[0])
+
+    PrintLineno()
+    global measure
 
     if measure:
         exec_start_time = datetime.datetime.now()
 
+    PrintLineno()
     if native:
         affectedRows = cursor.execute(cmd)
         if verbose:
@@ -379,6 +437,7 @@ def insert_func(process: int, thread: int, verbose: bool):
         restful_execute(
             host, port, user, password, cmd)
 
+    PrintLineno()
     if measure:
         exec_end_time = datetime.datetime.now()
         exec_delta = exec_end_time - exec_start_time
@@ -387,18 +446,41 @@ def insert_func(process: int, thread: int, verbose: bool):
                 "consume %d microseconds" %
                 exec_delta.microseconds)
 
+    PrintLineno()
     if native:
         cursor.close()
         conn.close()
+    PrintLineno()
 
 
 def create_tb_using_stb():
-    # TODO:
-    pass
+    if (numOfStb > 0):
+        for i in range(0, numOfDb):
+            if native:
+                cursor.execute("USE %s%d" % (dbName, i))
+            else:
+                restful_execute(
+                    host, port, user, password, "USE %s%d" %
+                    (dbName, i))
+
+            for j in range(0, numOfStb):
+                for k in range(0, numOfTb):
+                    if native:
+                        cursor.execute(
+                            "CREATE TABLE %s%d USING %s%d.%s%d TAGS('%d')" %
+                                (tbName, k, dbName, i, stbName, j, k))
+                    else:
+                        restful_execute(
+                            host,
+                            port,
+                            user,
+                            password,
+                            "CREATE TABLE %s%d USING %s%d.%s%d TAGS('%d')" %
+                                (tbName, k, dbName, i, stbName, j, k))
 
 
-def create_tb():
-    v_print("create_tb() numOfTb: %d", numOfTb)
+def create_tb_without_stb():
+    v_print("create_tb_without_stb() numOfTb: %d", numOfTb)
     for i in range(0, numOfDb):
         if native:
             cursor.execute("USE %s%d" % (dbName, i))
@@ -423,15 +505,17 @@ def create_tb():
 
 
 def insert_data_process(
-        lock,
+#        lock,
         i: int,
         begin: int,
         end: int,
-        threads: int,
-        verbose: int):
+        threads: int
+        ):
+    global verbose
+
     PrintLineno()
     try:
-        #        lock.acquire()
+#        lock.acquire()
         print(current_process().name + " acquire")
 
         tasks = end - begin
@@ -447,7 +531,7 @@ def insert_data_process(
                     workers = [
                         executor.submit(
                             insert_func,
-                            i, n, verbose) for n in range(
+                            i, n) for n in range(
                             j, k)]
                     wait(workers, return_when=ALL_COMPLETED)
         else:
@@ -455,16 +539,18 @@ def insert_data_process(
                 workers = [
                     executor.submit(
                         insert_func,
-                        i, j, verbose) for j in range(
+                        i, j) for j in range(
                         begin, end)]
                 wait(workers, return_when=ALL_COMPLETED)
     except BaseException:
+        PrintLineno()
         print(current_process().name + " lock failed")
 
     finally:
         if verbose:
             print(current_process().name + " release")
 #        lock.release()
+    PrintLineno()
 
 
 def query_db(i):
@@ -526,7 +612,6 @@ if __name__ == "__main__":
 
     verbose = False
     debug = False
-    native = False
     measure = True
     dropDbOnly = False
     colsPerRecord = 3
@@ -534,10 +619,9 @@ if __name__ == "__main__":
     dbName = "test"
     replica = 1
     batch = 1
-    numOfTb = 1
     tbName = "tb"
     useStable = False
-    numOfStb = 0
+    numOfStb = 1
     stbName = "stb"
     numOfRec = 10
     ieration = 1
@@ -630,6 +714,7 @@ if __name__ == "__main__":
             try:
                 import taos
             except Exception as e:
+                PrintLineno()
                 print("Error: %s" % e.args[0])
                 sys.exit(1)
             native = True
@@ -663,7 +748,6 @@ if __name__ == "__main__":
         if key in ['-N', '--normal']:
             useStable = False
             numOfStb = 0
-            numOfTb = 1
 
         if key in ['-s', '--stbname']:
             stbName = value
@@ -756,6 +840,7 @@ if __name__ == "__main__":
                 config=configDir)
             v_print("conn: %s", str(conn.__class__))
         except Exception as e:
+            PrintLineno()
             print("Error: %s" % e.args[0])
             sys.exit(1)
 
@@ -763,6 +848,7 @@ if __name__ == "__main__":
             cursor = conn.cursor()
             v_print("cursor:%d %s", id(cursor), str(cursor.__class__))
         except Exception as e:
+            PrintLineno()
             print("Error: %s" % e.args[0])
             conn.close()
             sys.exit(1)
@@ -796,7 +882,7 @@ if __name__ == "__main__":
         if (autosubtable == False):
             create_tb_using_stb()
     else:
-        create_tb()
+        create_tb_without_stb()
 
     if measure:
         end_time = time.time()
@@ -812,8 +898,8 @@ if __name__ == "__main__":
     if measure:
         start_time = time.time()
 
-    manager = Manager()
-    lock = manager.Lock()
+#    manager = Manager()
+#    lock = manager.Lock()
 
     begin = 0
     end = 0
@@ -841,12 +927,12 @@ if __name__ == "__main__":
         p = Process(
             target=insert_data_process,
             args=(
-                lock,
+                #lock,
                 i,
                 begin,
                 end,
-                threads,
-                verbose))
+                threads
+                ))
         procs.append(p)
         p.start()
 
