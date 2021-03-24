@@ -515,7 +515,7 @@ def printConfig():
     print("# Data out of order rate:            %s" % rateOOOO)
     print("# Delete method:                     %s" % deleteMethod)
     print("# Query command:                     %s" % queryCmd)
-    print("# Insert Only:                       %s" % insertOnly)
+    print("# Insert Only:                       %s" % notInsertOnly)
     print("# Verbose output                     %s" % verbose)
     print("# Test time:                         %s" %
           datetime.datetime.now().strftime("%d/%m/%Y %H:%M:%S"))
@@ -550,7 +550,7 @@ if __name__ == "__main__":
     defaultPass = "taosdata"
     processes = 1
     threads = 1
-    insertOnly = False
+    notInsertOnly = False
     autosubtable = False
     queryCmd = "NO"
     outOfOrder = 0
@@ -560,12 +560,12 @@ if __name__ == "__main__":
 
     try:
         opts, args = getopt.gnu_getopt(sys.argv[1:],
-                                       'Nh:p:u:P:d:a:m:Ms:Q:T:C:r:l:t:n:c:xOR:D:vgyH',
+                                       'Nh:p:u:P:d:a:m:Ns:Q:T:C:r:l:t:n:c:xOR:D:vgyH',
                                        [
             'native', 'host', 'port', 'user', 'password', 'dbname', 'replica', 'tbname',
-            'stable', 'stbname', 'query', 'threads', 'processes',
+            'normal', 'stbname', 'query', 'threads', 'processes',
             'recPerReq', 'colsPerRecord', 'numOfTb', 'numOfRec', 'config',
-            'insertOnly', 'outOfOrder', 'rateOOOO', 'deleteMethod',
+            'notInsertOnly', 'outOfOrder', 'rateOOOO', 'deleteMethod',
             'verbose', 'debug', 'skipPrompt', 'help'
         ])
     except getopt.GetoptError as err:
@@ -601,7 +601,7 @@ if __name__ == "__main__":
             print(
                 '\t-m, --tbname <table prefix>       table_prefix, Table prefix name. Default is \'t\'.')
             print(
-                '\t-M, --stable                      flag, Use super table. Default is no')
+                '\t-N, --normal                      flag, Use normal table. Default is no')
             print(
                 '\t-s, --stbname <stable prefix>     stable_prefix, STable prefix name. Default is \'st\'')
             print(
@@ -615,7 +615,7 @@ if __name__ == "__main__":
                 '\t-t, --numOfTb <number>            num_of_tables, The number of tables. Default is 1.')
             print('\t-n, --numOfRec <number>           num_of_records_per_table, The number of records per table. Default is 1.')
             print('\t-c, --config <path>               config_directory, Configuration directory. Default is \'/etc/taos/\'.')
-            print('\t-x, --inserOnly                   flag, Insert only flag.')
+            print('\t-x, --notInserOnly                flag, Not insert only flag.')
             print('\t-O, --outOfOrder                  out of order data insert, 0: In order, 1: Out of order. Default is in order.')
             print('\t-R, --rateOOOO <number>           rate, Out of order data\'s rate--if order=1 Default 10, min: 0, max: 50.')
             print('\t-D, --deleteMethod <number>       Delete data methods 0: don\'t delete, 1: delete by table, 2: delete by stable, 3: delete by database.')
@@ -660,9 +660,10 @@ if __name__ == "__main__":
         if key in ['-m', '--tbname']:
             tbName = value
 
-        if key in ['-M', '--stable']:
-            useStable = True
-            numOfStb = 1
+        if key in ['-N', '--normal']:
+            useStable = False
+            numOfStb = 0
+            numOfTb = 1
 
         if key in ['-s', '--stbname']:
             stbName = value
@@ -703,9 +704,9 @@ if __name__ == "__main__":
             configDir = value
             v_print("config dir: %s", configDir)
 
-        if key in ['-x', '--insertOnly']:
-            insertOnly = True
-            v_print("insert only: %d", insertOnly)
+        if key in ['-x', '--notInsertOnly']:
+            notInsertOnly = True
+            v_print("Not insert only: %d", notInsertOnly)
 
         if key in ['-O', '--outOfOrder']:
             outOfOrder = int(value)
