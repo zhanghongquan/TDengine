@@ -10,7 +10,7 @@ Author: Shuduo Sang <sangshuduo@gmail.com>
 
 	-H, --help                        Show usage.
 
-	-N, --native                      flag, Use native interface if set. Default is using RESTful interface.
+	-A, --native                      flag, Use native interface if set. Default is using RESTful interface.
 	-h, --host <hostname>             host, The host to connect to TDengine. Default is localhost.
 	-p, --port <port>                 port, The TCP/IP port number to use for the connection. Default is 0.
 	-u, --user <username>             user, The user name to use when connecting to the server. Default is 'root'.

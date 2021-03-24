@@ -560,7 +560,7 @@ if __name__ == "__main__":
 
     try:
         opts, args = getopt.gnu_getopt(sys.argv[1:],
-                                       'Nh:p:u:P:d:a:m:Ns:Q:T:C:r:l:t:n:c:xOR:D:vgyH',
+                                       'Ah:p:u:P:d:a:m:Ns:Q:T:C:r:l:t:n:c:xOR:D:vgyH',
                                        [
             'native', 'host', 'port', 'user', 'password', 'dbname', 'replica', 'tbname',
             'normal', 'stbname', 'query', 'threads', 'processes',
@@ -589,7 +589,7 @@ if __name__ == "__main__":
             print('\t-H, --help                        Show usage.')
             print('')
 
-            print('\t-N, --native                      flag, Use native interface if set. Default is using RESTful interface.')
+            print('\t-A, --native                      flag, Use native interface if set. Default is using RESTful interface.')
             print('\t-h, --host <hostname>             host, The host to connect to TDengine. Default is localhost.')
             print('\t-p, --port <port>                 port, The TCP/IP port number to use for the connection. Default is 0.')
             print('\t-u, --user <username>             user, The user name to use when connecting to the server. Default is \'root\'.')
@@ -626,7 +626,7 @@ if __name__ == "__main__":
             print('')
             sys.exit(0)
 
-        if key in ['-N', '--native']:
+        if key in ['-A', '--native']:
             try:
                 import taos
             except Exception as e:
