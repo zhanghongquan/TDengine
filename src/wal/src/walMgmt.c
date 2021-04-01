@@ -84,7 +84,7 @@ void *walOpen(char *path, SWalCfg *pCfg) {
     return NULL;
   }
 
-  wDebug("vgId:%d, wal:%p is opened, level:%d fsyncPeriod:%d", pWal->vgId, pWal, pWal->level, pWal->fsyncPeriod);
+  wInfo("vgId:%d, wal:%p is opened, level:%d fsyncPeriod:%d", pWal->vgId, pWal, pWal->level, pWal->fsyncPeriod);
 
   return pWal;
 }
@@ -94,7 +94,7 @@ int32_t walAlter(void *handle, SWalCfg *pCfg) {
   SWal *pWal = handle;
 
   if (pWal->level == pCfg->walLevel && pWal->fsyncPeriod == pCfg->fsyncPeriod) {
-    wDebug("vgId:%d, old walLevel:%d fsync:%d, new walLevel:%d fsync:%d not change", pWal->vgId, pWal->level,
+    wInfo("vgId:%d, old walLevel:%d fsync:%d, new walLevel:%d fsync:%d not change", pWal->vgId, pWal->level,
            pWal->fsyncPeriod, pCfg->walLevel, pCfg->fsyncPeriod);
     return TSDB_CODE_SUCCESS;
   }

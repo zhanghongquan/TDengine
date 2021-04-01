@@ -57,6 +57,27 @@ void vnodeNotifyRole(int32_t vgId, int8_t role) {
   }
 
   vInfo("vgId:%d, sync role changed from %s to %s", pVnode->vgId, syncRole[pVnode->role], syncRole[role]);
+
+  if (pVnode->role != TAOS_SYNC_ROLE_OFFLINE && !pVnode->walRestored) {
+    pVnode->version = pVnode->fversion;
+
+    if (role == TAOS_SYNC_ROLE_MASTER) {
+      vInfo("vgId:%d, start to restore wal for role is master, fver:%" PRIu64, pVnode->vgId, pVnode->fversion);
+      walRestore(pVnode->wal, pVnode, vnodeProcessWrite);
+      if (pVnode->version == 0) {
+        pVnode->fversion = 0;
+        pVnode->version = walGetVersion(pVnode->wal);
+      }
+    } else {
+      vInfo("vgId:%d, no need restore wal for role is not master, vver:%" PRIu64, pVnode->vgId, pVnode->version);
+      if (pVnode->version != pVnode->fversion) {
+        syncReconfig(pVnode->vgId, &pVnode->syncCfg);
+      }
+    }
+
+    pVnode->walRestored = 1;
+  }
+
   pVnode->role = role;
   dnodeSendStatusMsgToMnode();
 

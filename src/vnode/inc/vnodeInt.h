@@ -49,6 +49,8 @@ typedef struct {
   int8_t   dbReplica;
   int8_t   dropped;
   int8_t   dbType;
+  int8_t   walRestored;
+  int8_t   reserved[7];
   uint64_t version;   // current version
   uint64_t cversion;  // version while commit start
   uint64_t fversion;  // version on saved data file

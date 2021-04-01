@@ -323,20 +323,29 @@ int32_t vnodeOpen(int32_t vgId) {
     return terrno;
   }
 
-  walRestore(pVnode->wal, pVnode, vnodeProcessWrite);
-  if (pVnode->version == 0) {
-    pVnode->fversion = 0;
-    pVnode->version = walGetVersion(pVnode->wal);
-  }
-
   if (pVnode->syncCfg.replica == 1) {
+    vInfo("vgId:%d, start to restore wal for repica is 1", pVnode->vgId);
+
+    walRestore(pVnode->wal, pVnode, vnodeProcessWrite);
+    if (pVnode->version == 0) {
+      pVnode->fversion = 0;
+      pVnode->version = walGetVersion(pVnode->wal);
+    }
+
     code = tsdbSyncCommit(pVnode->tsdb);
     if (code != 0) {
       vError("vgId:%d, failed to commit after restore from wal since %s", pVnode->vgId, tstrerror(code));
       vnodeCleanUp(pVnode);
       return code;
     }
+
+    pVnode->walRestored = 1;
     walRemoveAllOldFiles(pVnode->wal);
+  } else {
+    vInfo("vgId:%d, start to get wal latest version", pVnode->vgId);
+    uint64_t latestWalVer = walGetFileLatestVersion(pVnode->wal);
+    if (latestWalVer != 0) pVnode->version = latestWalVer;
+    vDebug("vgId:%d, get wal lastest version, wver:%" PRIu64 " vver:%" PRIu64, pVnode->vgId, latestWalVer, pVnode->version);
   }
 
   walRenew(pVnode->wal);

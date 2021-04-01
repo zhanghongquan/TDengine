@@ -31,7 +31,7 @@ int32_t walRenew(void *handle) {
   int32_t code = 0;
 
   if (pWal->stop) {
-    wDebug("vgId:%d, do not create a new wal file", pWal->vgId);
+    wInfo("vgId:%d, do not create a new wal file", pWal->vgId);
     return 0;
   }
 
@@ -39,7 +39,7 @@ int32_t walRenew(void *handle) {
 
   if (tfValid(pWal->tfd)) {
     tfClose(pWal->tfd);
-    wDebug("vgId:%d, file:%s, it is closed while renew", pWal->vgId, pWal->name);
+    wInfo("vgId:%d, file:%s, it is closed while renew", pWal->vgId, pWal->name);
   }
 
   if (pWal->keep == TAOS_WAL_KEEP) {
@@ -56,7 +56,7 @@ int32_t walRenew(void *handle) {
     code = TAOS_SYSTEM_ERROR(errno);
     wError("vgId:%d, file:%s, failed to open since %s", pWal->vgId, pWal->name, strerror(errno));
   } else {
-    wDebug("vgId:%d, file:%s, it is created and open while renew", pWal->vgId, pWal->name);
+    wInfo("vgId:%d, file:%s, it is created and open while renew", pWal->vgId, pWal->name);
   }
 
   pthread_mutex_unlock(&pWal->mutex);
@@ -97,7 +97,7 @@ void walRemoveAllOldFiles(void *handle) {
   pthread_mutex_lock(&pWal->mutex);
   
   tfClose(pWal->tfd);
-  wDebug("vgId:%d, file:%s, it is closed before remove all wals", pWal->vgId, pWal->name);
+  wInfo("vgId:%d, file:%s, it is closed before remove all wals", pWal->vgId, pWal->name);
 
   while (walGetNextFile(pWal, &fileId) >= 0) {
     snprintf(pWal->name, sizeof(pWal->name), "%s/%s%" PRId64, pWal->path, WAL_PREFIX, fileId);
@@ -213,7 +213,7 @@ int32_t walRestore(void *handle, void *pVnode, FWalWrite writeFp) {
   if (pWal->keep != TAOS_WAL_KEEP) return TSDB_CODE_SUCCESS;
 
   if (count == 0) {
-    wDebug("vgId:%d, wal file not exist, renew it", pWal->vgId);
+    wInfo("vgId:%d, wal file not exist, renew it", pWal->vgId);
     return walRenew(pWal);
   } else {
     // open the existing WAL file in append mode
@@ -224,7 +224,7 @@ int32_t walRestore(void *handle, void *pVnode, FWalWrite writeFp) {
       wError("vgId:%d, file:%s, failed to open since %s", pWal->vgId, pWal->name, strerror(errno));
       return TAOS_SYSTEM_ERROR(errno);
     }
-    wDebug("vgId:%d, file:%s, it is created and open while restore", pWal->vgId, pWal->name);
+    wInfo("vgId:%d, file:%s, it is created and open while restore", pWal->vgId, pWal->name);
   }
 
   return TSDB_CODE_SUCCESS;
@@ -322,7 +322,7 @@ static int32_t walRestoreWalFile(SWal *pWal, void *pVnode, FWalWrite writeFp, ch
     tfree(buffer);
     return TAOS_SYSTEM_ERROR(errno);
   } else {
-    wDebug("vgId:%d, file:%s, open for restore", pWal->vgId, name);
+    wInfo("vgId:%d, file:%s, open for restore", pWal->vgId, name);
   }
 
   int32_t   code = TSDB_CODE_SUCCESS;
@@ -436,7 +436,7 @@ static int32_t walRestoreWalFile(SWal *pWal, void *pVnode, FWalWrite writeFp, ch
   tfClose(tfd);
   tfree(buffer);
 
-  wDebug("vgId:%d, file:%s, it is closed after restore", pWal->vgId, name);
+  wInfo("vgId:%d, file:%s, it is closed after restore", pWal->vgId, name);
   return code;
 }
 
@@ -460,4 +460,22 @@ void walResetVersion(twalh param, uint64_t newVer) {
   pWal->version = newVer;
   walRemoveAllOldFiles(param);
   walRenew(param);
+}
+
+int32_t walCalcVersion(void *ahandle, void *pHead, int32_t qtype, void *pMsg) {
+  int64_t *latestVer = ahandle;
+  (*latestVer)++;
+
+  return 0;
+}
+
+uint64_t walGetFileLatestVersion(twalh param) {
+  SWal *pWal = param;
+  if (pWal == 0) return 0;
+
+  int64_t latestVer = 0;
+  walRestore(pWal, &latestVer, walCalcVersion);
+
+  wInfo("vgId:%d, the latest wal version is %" PRIu64, pWal->vgId, latestVer);
+  return latestVer;
 }
