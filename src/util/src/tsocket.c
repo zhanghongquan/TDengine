@@ -300,7 +300,7 @@ SOCKET taosOpenTcpClientSocket(uint32_t destIp, uint16_t destPort, uint32_t clie
 
   sockFd = socket(PF_INET, SOCK_STREAM, IPPROTO_TCP);
 
-  if (sockFd <= 2) {
+  if (sockFd < 0) {
     uError("failed to open the socket: %d (%s)", errno, strerror(errno));
     taosCloseSocketNoCheck(sockFd);
     return -1;
