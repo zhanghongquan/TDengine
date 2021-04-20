@@ -320,7 +320,7 @@ int32_t handleUserDefinedFunc(SSqlObj* pSql, struct SSqlInfo* pInfo) {
     if (ret) {
       return ret;
     }
-    if (isValidScript(buf)) {
+    if (!isValidScript(buf)) {
       return invalidSqlErrMsg(tscGetErrorMsgPayload(pCmd), msg4); 
     } 
 
@@ -7369,7 +7369,7 @@ int32_t parseHavingClause(SQueryInfo* pQueryInfo, tSqlExpr* pExpr, SSqlCmd* pCmd
   }
 
   //REDO function check
-  if (!functionCompatibleCheck(pQueryInfo, joinQuery, timeWindowQuery)) {
+  if (!functionCompatibleCheck(pCmd, pQueryInfo, joinQuery, timeWindowQuery)) {
     return invalidSqlErrMsg(tscGetErrorMsgPayload(pCmd), msg2);
   }
 
