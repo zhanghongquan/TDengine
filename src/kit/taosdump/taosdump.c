@@ -482,8 +482,12 @@ static int queryDbImpl(TAOS *taos, char *command) {
 
 static void parse_args(int argc, char *argv[], SArguments *arguments) {
   for (int i = 1; i < argc; i++) {
+<<<<<<< HEAD
     if ((strcmp(argv[i], "-S") == 0)
         || (strcmp(argv[i], "-E") == 0)) {
+=======
+    if (strcmp(argv[i], "-E") == 0) {
+>>>>>>> 69ddc9252438a27662863c31cf14452f81facb45
       if (argv[i+1]) {
         char *tmp = strdup(argv[++i]);
 
@@ -510,7 +514,11 @@ static void parse_args(int argc, char *argv[], SArguments *arguments) {
           exit(-1);
         }
       } else {
+<<<<<<< HEAD
         errorPrint("%s need a valid value following!\n", argv[i]);
+=======
+        errorPrint("%s() LN%d, -E need a valid value following!\n", __func__, __LINE__);
+>>>>>>> 69ddc9252438a27662863c31cf14452f81facb45
         exit(-1);
       }
     } else if (strcmp(argv[i], "-g") == 0) {
