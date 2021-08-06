@@ -907,10 +907,13 @@ SCreatedTableInfo createNewChildTableInfo(SStrToken *pTableName, SArray *pTagNam
   return info;
 }
 
-SAlterTableInfo *tSetAlterTableInfo(SStrToken *pTableName, SArray *pCols, SArray *pVals, int32_t type, int16_t tableType) {
+SAlterTableInfo *tSetAlterTableInfo(SStrToken *pTableName, SStrToken* pSuperTableName, SArray *pCols, SArray *pVals, int32_t type, int16_t tableType) {
   SAlterTableInfo *pAlterTable = calloc(1, sizeof(SAlterTableInfo));
   
   pAlterTable->name = *pTableName;
+  if(pSuperTableName) {
+    pAlterTable->stableName = *pSuperTableName;
+  }
   pAlterTable->type = type;
   pAlterTable->tableType = tableType;
 

@@ -5737,6 +5737,8 @@ int32_t setAlterTableInfo(SSqlObj* pSql, struct SSqlInfo* pInfo) {
   const char* msg23 = "only column length coulbe be modified";
   const char* msg24 = "invalid binary/nchar column length";
 
+  const char* msg25 = "invalid super table name";
+
   int32_t code = TSDB_CODE_SUCCESS;
 
   SSqlCmd*        pCmd = &pSql->cmd;
@@ -5754,6 +5756,11 @@ int32_t setAlterTableInfo(SSqlObj* pSql, struct SSqlInfo* pInfo) {
     return code;
   }
 
+  if(pAlterSQL->type == TSDB_ALTER_TABLE_ATTACH_TO_STABLE && tscValidateName(&(pAlterSQL->stableName)) != TSDB_CODE_SUCCESS ) {
+    return invalidOperationMsg(tscGetErrorMsgPayload(pCmd), msg25);
+  }
+
+  //TODO: 在alter table中设置super table的名字， id以及相应的tag
   code = tscGetTableMeta(pSql, pTableMetaInfo);
   if (code != TSDB_CODE_SUCCESS) {
     return code;

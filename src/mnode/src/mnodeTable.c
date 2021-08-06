@@ -3376,7 +3376,12 @@ static int32_t mnodeProcessAlterTableMsg(SMnodeMsg *pMsg) {
       code = mnodeDropNormalTableColumn(pMsg, pAlter->schema[0].name);
     } else if (pAlter->type == TSDB_ALTER_TABLE_CHANGE_COLUMN) {
       code = mnodeChangeNormalTableColumn(pMsg);
+    } else if(pAlter->type == TSDB_ALTER_TABLE_ATTACH_TO_STABLE) {
+      //TODO: attach to stable not implemented
+    } else if(pAlter->type == TSDB_ALTER_TABLE_DETACH_FROM_STABLE) {
+      //TODO: detach from stable not implemented
     } else {
+
     }
   }
 

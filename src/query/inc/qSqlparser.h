@@ -152,6 +152,7 @@ typedef struct SCreateTableSql {
 
 typedef struct SAlterTableInfo {
   SStrToken          name;
+  SStrToken          stableName;
   int16_t            tableType;
   int16_t            type;
   STagData           tagData;
@@ -300,7 +301,7 @@ int32_t tSqlExprCompare(tSqlExpr *left, tSqlExpr *right);
 
 SCreateTableSql *tSetCreateTableInfo(SArray *pCols, SArray *pTags, SSqlNode *pSelect, int32_t type);
 
-SAlterTableInfo *tSetAlterTableInfo(SStrToken *pTableName, SArray *pCols, SArray *pVals, int32_t type, int16_t tableTable);
+SAlterTableInfo *tSetAlterTableInfo(SStrToken *pTableName, SStrToken* pSuperTableName, SArray *pCols, SArray *pVals, int32_t type, int16_t tableTable);
 SCreatedTableInfo createNewChildTableInfo(SStrToken *pTableName, SArray *pTagNames, SArray *pTagVals, SStrToken *pToken, SStrToken* igExists);
 
 void destroyAllSqlNode(SArray *pSqlNode);

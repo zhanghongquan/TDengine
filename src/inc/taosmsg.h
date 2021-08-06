@@ -168,6 +168,8 @@ enum _mgmt_table {
 #define TSDB_ALTER_TABLE_DROP_COLUMN       6
 #define TSDB_ALTER_TABLE_CHANGE_COLUMN     7
 #define TSDB_ALTER_TABLE_MODIFY_TAG_COLUMN 8
+#define TSDB_ALTER_TABLE_ATTACH_TO_STABLE  9
+#define TSDB_ALTER_TABLE_DETACH_FROM_STABLE 10
 
 #define TSDB_FILL_NONE             0
 #define TSDB_FILL_NULL             1
@@ -308,6 +310,7 @@ typedef struct {
 
 typedef struct {
   char    tableFname[TSDB_TABLE_FNAME_LEN];
+  char    stableFname[TSDB_TABLE_FNAME_LEN]; /*used for super table name that this table attached to*/
   char    db[TSDB_ACCT_ID_LEN + TSDB_DB_NAME_LEN];
   int16_t type; /* operation type   */
   int16_t numOfCols; /* number of schema */
